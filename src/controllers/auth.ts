@@ -1,69 +1,85 @@
-import { Request, RequestHandler, Response } from "express";
-import Jwt from "jsonwebtoken";
+import UserModel from "@/models/user";
+import VerificationTokenModel from "@/models/verificationToken";
 import crypto from "crypto";
-import VerificationToken from "@/models/verificationToken";
-import User from "@/models/user";
-import { mail } from "@/utils/mail";
-import { sendErrorResponse } from "@/utils/helpers";
+import { RequestHandler } from "express";
+import mail from "@/utils/mail";
+import { formatUserProfile, sendErrorResponse } from "@/utils/helpers";
+import jwt from "jsonwebtoken";
 
-export const authGenerateLink: RequestHandler = async (
-  req: Request,
-  res: Response
-) => {
+export const generateAuthLink: RequestHandler = async (req, res) => {
   const { email } = req.body;
-  let user = await User.findOne({ email });
+  let user = await UserModel.findOne({ email });
   if (!user) {
-    user = await User.create({ email });
+    user = await UserModel.create({ email });
   }
+  const userId = user._id.toString();
   const randomToken = crypto.randomBytes(32).toString("hex");
 
-  await VerificationToken.create<{ userId: string }>({
-    userId: user._id.toString(),
+  await VerificationTokenModel.create<{ userId: string }>({
+    userId,
     token: randomToken,
   });
 
-  // Looking to send emails in production? Check out our Email API/SMTP product!
+  const link = `${process.env.VERIFICATION_LINK}?token=${randomToken}&userId=${userId}`;
 
-  const link = `${process.env.VERIFICATION_LINK}?token=${randomToken}&userId=${user._id}`;
   await mail.sendVerificationMail({
-    link,
     to: user.email,
+    link,
   });
-  res.status(200).json({
-    message: "please check email to verify your account",
+
+  res.json({
+    message: "Verification link has been sent to your email",
   });
 };
 
 export const verifyAuthToken: RequestHandler = async (req, res) => {
-  console.log(req.query);
   const { token, userId } = req.query;
-
   if (typeof token !== "string" || typeof userId !== "string") {
     return sendErrorResponse({
       res,
       status: 403,
-      message: "invalid token or userId",
+      message: "Invalid Request! ",
     });
   }
-  const verificationToken = await VerificationToken.findOne({ userId });
-  if (!verificationToken || !(await verificationToken.verifyToken(token))) {
+
+  const verificationToken = await VerificationTokenModel.findOne({
+    userId,
+  });
+  if (!verificationToken || !(await verificationToken.compare(token))) {
     return sendErrorResponse({
       res,
       status: 403,
-      message: "invalid request,token mismatch",
+      message: "Invalid Request!,token mismatch! ",
     });
   }
-  const user = await User.findById(userId);
+  const user = await UserModel.findById(userId);
   if (!user) {
     return sendErrorResponse({
       res,
-      status: 500,
-      message: "Something went wrong,user not found!",
+      status: 403,
+      message: "something went wrong!,user not found!",
     });
   }
-  await VerificationToken.findByIdAndDelete(verificationToken._id);
-  const jwtToken = Jwt.sign({ userId: user._id }, process.env.JWT_SECRET!, {
+  await VerificationTokenModel.findByIdAndDelete(verificationToken._id);
+
+  const authToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET!, {
     expiresIn: "16d",
   });
-  res.status(200).json({ token: jwtToken });
+  res.cookie("authToken", authToken, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    expires: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000),
+  });
+
+  res.redirect(
+    `${process.env.AUTH_SUCCESS_URL}/profile=${JSON.stringify(
+      formatUserProfile(user)
+    )}`
+  );
+
+  res.json({
+    token,
+    message: "okay!",
+  });
 };

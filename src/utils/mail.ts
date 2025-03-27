@@ -13,7 +13,7 @@ var transport = nodemailer.createTransport({
   },
 });
 
-export const mail = {
+const mail = {
   async sendVerificationMail(options: MailOptions) {
     await transport.sendMail({
       to: options.to,
@@ -29,3 +29,5 @@ export const mail = {
     });
   },
 };
+
+export default mail;

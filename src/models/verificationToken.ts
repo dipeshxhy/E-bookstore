@@ -1,34 +1,51 @@
-import mongoose from "mongoose";
+import { Model, Schema, model } from "mongoose";
 import bcrypt from "bcryptjs";
 
-interface VerificationTokenDocument extends mongoose.Document {
+interface VerificationTokenDoc {
   userId: string;
   token: string;
   expires: Date;
-  verifyToken: (token: string) => Promise<boolean>;
 }
-const verificationTokenSchema = new mongoose.Schema<VerificationTokenDocument>({
+
+interface Methods {
+  compare(token: string): Promise<boolean>;
+}
+
+const verificationTokenSchema = new Schema<VerificationTokenDoc, {}, Methods>({
   userId: {
     type: String,
     required: true,
   },
-  token: { type: String, required: true },
-  expires: { type: Date, default: Date.now, expires: 60 * 60 * 24 },
+  token: {
+    type: String,
+    required: true,
+  },
+  expires: {
+    type: Date,
+    default: Date.now(),
+    expires: 60 * 60 * 24,
+  },
 });
+
 verificationTokenSchema.pre("save", async function (next) {
   if (this.isModified("token")) {
     this.token = await bcrypt.hash(this.token, 10);
   }
+
   next();
 });
 
-verificationTokenSchema.methods.verifyToken = async function (token: string) {
+verificationTokenSchema.methods.compare = async function (token) {
   return await bcrypt.compare(token, this.token);
 };
 
-const VerificationToken = mongoose.model(
+const VerificationTokenModel = model(
   "VerificationToken",
   verificationTokenSchema
 );
 
-export default VerificationToken as mongoose.Model<VerificationTokenDocument>;
+export default VerificationTokenModel as Model<
+  VerificationTokenDoc,
+  {},
+  Methods
+>;
