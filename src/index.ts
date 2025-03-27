@@ -1,9 +1,13 @@
 import express from "express";
+import authRouter from "./routes/auth";
 
 const app = express();
 app.get("/", (req, res) => {
   res.send("Hello World");
 });
+
+app.use("/api/auth", authRouter);
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
