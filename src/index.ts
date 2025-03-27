@@ -1,6 +1,8 @@
+import "express-async-errors";
 import express from "express";
 import authRouter from "./routes/auth";
 import { connectedDB } from "./config/db/connectDB";
+import { errorHandler } from "./middlewares/errorHandler";
 
 connectedDB();
 
@@ -11,7 +13,9 @@ app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
-app.use("/api/auth", authRouter);
+app.use("/auth", authRouter);
+
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 

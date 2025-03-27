@@ -1,7 +1,13 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const verificationTokenSchema = new mongoose.Schema({
+interface VerificationTokenDocument extends mongoose.Document {
+  userId: string;
+  token: string;
+  expires: Date;
+  verifyToken: (token: string) => Promise<boolean>;
+}
+const verificationTokenSchema = new mongoose.Schema<VerificationTokenDocument>({
   userId: {
     type: String,
     required: true,
@@ -25,4 +31,4 @@ const VerificationToken = mongoose.model(
   verificationTokenSchema
 );
 
-export default VerificationToken;
+export default VerificationToken as mongoose.Model<VerificationTokenDocument>;

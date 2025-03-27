@@ -19,7 +19,7 @@ export const mail = {
       to: options.to,
       from: process.env.VERIFICATION_MAIL,
       subject: "Auth Verification",
-      text: `
+      html: `
     <div>
     <div>
     <p>please click this <a href="${options.link}"> link</a> to verify your account</p>
